@@ -131,4 +131,3 @@ Taskify разработан с использованием современн�
 - [Firebase](https://firebase.google.com)
 - [React Native Paper](https://reactnativepaper.com)
 - [React Native Calendars](https://github.com/wix/react-native-calendars)
-1
