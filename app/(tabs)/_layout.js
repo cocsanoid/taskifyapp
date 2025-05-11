@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Tabs } from 'expo-router';
-import { useColorScheme, Platform, StyleSheet, View, Pressable, Dimensions } from 'react-native';
+import { useColorScheme, Platform, StyleSheet, View, Pressable, Dimensions, Animated } from 'react-native';
 import { Ionicons, MaterialCommunityIcons, FontAwesome5 } from '@expo/vector-icons';
 import { PaperProvider, MD3LightTheme, MD3DarkTheme, Text, useTheme } from 'react-native-paper';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -13,6 +13,30 @@ import { useTheme as useCustomTheme } from '../context/ThemeContext';
 // Responsive layout breakpoints
 const TABLET_BREAKPOINT = 768;
 const DESKTOP_BREAKPOINT = 1024;
+
+// Helper function to handle shadow styles for both web and native
+const getShadowStyle = (elevation = 5, direction = 'down') => {
+  if (Platform.OS === 'web') {
+    // For web, use boxShadow
+    const yOffset = direction === 'up' ? `-${elevation}px` : `${elevation}px`;
+    return { 
+      boxShadow: `0 ${yOffset} ${elevation * 2}px rgba(0, 0, 0, 0.1)` 
+    };
+  } else {
+    // For native, use shadowProps and elevation
+    const shadowOffset = direction === 'up' 
+      ? { width: 0, height: -elevation } 
+      : { width: 0, height: elevation };
+    
+    return {
+      shadowColor: '#000',
+      shadowOffset,
+      shadowOpacity: 0.1,
+      shadowRadius: elevation,
+      elevation: elevation * 2,
+    };
+  }
+}
 
 // Define themes inline instead of importing
 const lightTheme = {
@@ -44,8 +68,24 @@ const darkTheme = {
 };
 
 // Custom Side Tabs for web platform
-function CustomSideTabs({ navigation, state, descriptors, theme }) {
+function CustomSideTabs({ navigation, state, descriptors, theme, onToggleSidebar }) {
   const [hoverIndex, setHoverIndex] = useState(-1);
+  const [isMenuVisible, setIsMenuVisible] = useState(true);
+  const translateAnim = useState(new Animated.Value(0))[0];
+  
+  // Update parent component when menu visibility changes
+  useEffect(() => {
+    if (onToggleSidebar) {
+      onToggleSidebar(isMenuVisible);
+    }
+    
+    // Animate the sidebar
+    Animated.timing(translateAnim, {
+      toValue: isMenuVisible ? 0 : -220,
+      duration: 300,
+      useNativeDriver: true,
+    }).start();
+  }, [isMenuVisible, onToggleSidebar, translateAnim]);
   
   // Get tab colors from theme
   const getTabColors = (routeName) => {
@@ -72,116 +112,149 @@ function CustomSideTabs({ navigation, state, descriptors, theme }) {
   };
   
   return (
-    <View style={[
-      styles.sideTabContainer,
-      { backgroundColor: theme.colors.surface }
-    ]}>
-      {state.routes.map((route, index) => {
-        const { options } = descriptors[route.key];
-        const label = options.title || route.name;
-        
-        // Get tab-specific colors
-        const tabColors = getTabColors(route.name) || 
-          (theme.dark ? Colors.dark.homeTab : Colors.light.homeTab);
-        
-        const isFocused = state.index === index;
-        const icon = options.tabBarIcon ? options.tabBarIcon({
-          color: isFocused ? tabColors.primary : '#777',
-          size: 24,
-        }) : null;
-        
-        const onPress = () => {
-          const event = navigation.emit({
-            type: 'tabPress',
-            target: route.key,
-            canPreventDefault: true,
-          });
+    <>
+      <Animated.View style={[
+        styles.sideTabContainer,
+        { 
+          backgroundColor: theme.colors.surface,
+          transform: [{ translateX: translateAnim }],
+        }
+      ]}>
+        {state.routes.map((route, index) => {
+          const { options } = descriptors[route.key];
+          const label = options.title || route.name;
+          
+          // Get tab-specific colors
+          const tabColors = getTabColors(route.name) || 
+            (theme.dark ? Colors.dark.homeTab : Colors.light.homeTab);
+          
+          const isFocused = state.index === index;
+          const icon = options.tabBarIcon ? options.tabBarIcon({
+            color: isFocused ? tabColors.primary : '#777',
+            size: 24,
+          }) : null;
+          
+          const onPress = () => {
+            const event = navigation.emit({
+              type: 'tabPress',
+              target: route.key,
+              canPreventDefault: true,
+            });
 
-          if (!isFocused && !event.defaultPrevented) {
-            navigation.navigate(route.name);
-          }
-        };
-        
-        return (
-          <Pressable
-            key={route.key}
-            onPress={onPress}
-            onHoverIn={() => setHoverIndex(index)}
-            onHoverOut={() => setHoverIndex(-1)}
-            style={[
-              styles.sideTabItem,
-              isFocused && [
-                styles.sideTabItemActive,
-                { 
-                  borderLeftColor: tabColors.primary || '#7e41d4',
-                  backgroundColor: theme.dark 
-                    ? `rgba(${hexToRgb(tabColors.primary || '#7e41d4')}, 0.1)` 
-                    : `rgba(${hexToRgb(tabColors.primary || '#7e41d4')}, 0.15)`
-                }
-              ],
-              hoverIndex === index && !isFocused && [
-                styles.sideTabItemHover,
-                { backgroundColor: `rgba(${hexToRgb(tabColors.primary || '#7e41d4')}, 0.05)` }
-              ]
-            ]}
-          >
-            {/* Tab background pattern */}
-            {isFocused && (
-              <View style={styles.tabPattern}>
-                {Array.from({ length: 3 }).map((_, i) => (
-                  <View 
-                    key={i}
-                    style={[
-                      styles.patternCircle,
-                      { 
-                        backgroundColor: tabColors.primary,
-                        opacity: 0.03 + (i * 0.02),
-                        right: i * 15 - 5,
-                        top: i * 15 - 5,
-                        width: 30 + (i * 10),
-                        height: 30 + (i * 10),
-                      }
-                    ]}
-                  />
-                ))}
-              </View>
-            )}
-            
-            <View style={styles.sideTabContent}>
-              {icon !== null ? (
-                <View style={[
-                  styles.iconWrapper,
-                  isFocused && { backgroundColor: `rgba(${hexToRgb(tabColors.primary || '#7e41d4')}, 0.1)` }
-                ]}>
-                  {icon}
-                </View>
-              ) : null}
-              <Text 
-                style={[
-                  styles.sideTabLabel,
-                  { color: isFocused ? tabColors.primary : '#777', backgroundColor: 'transparent' },
-                  hoverIndex === index && !isFocused && { color: tabColors.primary }
-                ]}
-              >
-                {label}
-              </Text>
-            </View>
-            
-            {(isFocused || hoverIndex === index) && (
-              <View 
-                style={[
-                  styles.glowEffect,
+            if (!isFocused && !event.defaultPrevented) {
+              navigation.navigate(route.name);
+            }
+          };
+          
+          return (
+            <Pressable
+              key={route.key}
+              onPress={onPress}
+              onHoverIn={() => setHoverIndex(index)}
+              onHoverOut={() => setHoverIndex(-1)}
+              style={[
+                styles.sideTabItem,
+                isFocused && [
+                  styles.sideTabItemActive,
                   { 
-                    backgroundColor: tabColors.primary,
-                    opacity: isFocused ? 0.15 : 0.05
+                    borderLeftColor: tabColors.primary || '#7e41d4',
+                    backgroundColor: theme.dark 
+                      ? `rgba(${hexToRgb(tabColors.primary || '#7e41d4')}, 0.1)` 
+                      : `rgba(${hexToRgb(tabColors.primary || '#7e41d4')}, 0.15)`
                   }
-                ]} 
-              />
-            )}
-          </Pressable>
-        );
-      })}
-    </View>
+                ],
+                hoverIndex === index && !isFocused && [
+                  styles.sideTabItemHover,
+                  { backgroundColor: `rgba(${hexToRgb(tabColors.primary || '#7e41d4')}, 0.05)` }
+                ]
+              ]}
+            >
+              {/* Tab background pattern */}
+              {isFocused && (
+                <View style={styles.tabPattern}>
+                  {Array.from({ length: 3 }).map((_, i) => (
+                    <View 
+                      key={i}
+                      style={[
+                        styles.patternCircle,
+                        { 
+                          backgroundColor: tabColors.primary,
+                          opacity: 0.03 + (i * 0.02),
+                          right: i * 15 - 5,
+                          top: i * 15 - 5,
+                          width: 30 + (i * 10),
+                          height: 30 + (i * 10),
+                        }
+                      ]}
+                    />
+                  ))}
+                </View>
+              )}
+              
+              <View style={styles.sideTabContent}>
+                {icon !== null ? (
+                  <View style={[
+                    styles.iconWrapper,
+                    isFocused && { backgroundColor: `rgba(${hexToRgb(tabColors.primary || '#7e41d4')}, 0.1)` }
+                  ]}>
+                    {icon}
+                  </View>
+                ) : null}
+                <Text 
+                  style={[
+                    styles.sideTabLabel,
+                    { color: isFocused ? tabColors.primary : '#777', backgroundColor: 'transparent' },
+                    hoverIndex === index && !isFocused && { color: tabColors.primary }
+                  ]}
+                >
+                  {label}
+                </Text>
+              </View>
+              
+              {(isFocused || hoverIndex === index) && (
+                <View 
+                  style={[
+                    styles.glowEffect,
+                    { 
+                      backgroundColor: tabColors.primary,
+                      opacity: isFocused ? 0.15 : 0.05
+                    }
+                  ]} 
+                />
+              )}
+            </Pressable>
+          );
+        })}
+      </Animated.View>
+      
+      <Pressable
+        onPress={() => setIsMenuVisible(!isMenuVisible)}
+        style={[
+          styles.menuToggleButton,
+          { 
+            backgroundColor: theme.colors.surface,
+            left: isMenuVisible ? 220 : 20,
+            borderColor: theme.dark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)',
+            ...getShadowStyle(2), // Apply shadow using helper function
+          }
+        ]}
+      >
+        <View style={[
+          styles.toggleIconContainer,
+          { 
+            backgroundColor: `rgba(${hexToRgb(theme.colors.primary)}, ${isMenuVisible ? 0.1 : 0.15})`,
+            borderWidth: isMenuVisible ? 0 : 1,
+            borderColor: isMenuVisible ? 'transparent' : theme.colors.primary,
+          }
+        ]}>
+          <Ionicons 
+            name={isMenuVisible ? "chevron-back" : "chevron-forward"} 
+            size={24} 
+            color={theme.colors.primary} 
+          />
+        </View>
+      </Pressable>
+    </>
   );
 }
 
@@ -256,18 +329,7 @@ function CustomBottomTabs({ navigation, state, descriptors, theme }) {
         backgroundColor: theme.colors.surface,
         paddingBottom: Math.max(insets.bottom, 8), // Ensure safe area on devices with notches
         borderTopColor: theme.dark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)',
-        ...(Platform.OS === 'web' 
-          ? {
-              boxShadow: '0px -3px 3px rgba(0,0,0,0.1)'
-            } 
-          : {
-              shadowColor: '#000',
-              shadowOffset: { width: 0, height: -3 },
-              shadowOpacity: 0.1,
-              shadowRadius: 3,
-              elevation: 10
-            }
-        ),
+        ...getShadowStyle(3, 'up'), // Apply shadow upwards for bottom tabs
       }
     ]}>
       {state.routes.map((route, index) => {
@@ -383,6 +445,7 @@ export default function TabsLayout() {
   const { isDarkMode } = useCustomTheme();
   const [loaded, setLoaded] = useState(true);
   const [dimensions, setDimensions] = useState(Dimensions.get('window'));
+  const [isSidebarVisible, setIsSidebarVisible] = useState(true);
   
   // Set Russian as the only language
   useEffect(() => {
@@ -462,11 +525,20 @@ export default function TabsLayout() {
               marginBottom: 5,
             },
             contentStyle: {
-              marginLeft: 220, // Add margin equal to side menu width
+              marginLeft: isSidebarVisible ? 220 : 0, // Adjust margin based on sidebar visibility
               paddingLeft: 30, // Increase padding from 20 to 30px
+              transition: 'margin-left 0.3s ease', // Smooth transition for web
             },
           }}
-          tabBar={props => <CustomSideTabs {...props} theme={theme} />}
+          tabBar={props => {
+            // Pass the sidebar visibility state to the custom tabbar
+            const tabProps = {
+              ...props,
+              theme: theme,
+              onToggleSidebar: (visible) => setIsSidebarVisible(visible),
+            };
+            return <CustomSideTabs {...tabProps} />;
+          }}
         >
           <Tabs.Screen
             name="home"
@@ -609,6 +681,7 @@ const styles = StyleSheet.create({
     overflow: 'auto',
     display: 'flex',
     flexDirection: 'column',
+    transition: 'transform 0.3s ease', // Smooth transition for web
   },
   sideTabItem: {
     padding: 15,
@@ -723,5 +796,25 @@ const styles = StyleSheet.create({
     width: 4,
     height: 4,
     borderRadius: 2,
+  },
+  menuToggleButton: {
+    position: 'fixed',
+    top: 20,
+    left: 220,
+    zIndex: 1001,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    transition: 'left 0.3s ease', // Smooth transition for web
+  },
+  toggleIconContainer: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 }); 

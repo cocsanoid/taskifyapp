@@ -44,8 +44,8 @@ import { router } from 'expo-router';
 import TabAppBar from '../components/TabAppBar';
 import PageBackground from '../../components/PageBackground';
 import TabBackground from '../components/TabBackground';
-import { useTheme as useCustomTheme } from '../context/ThemeContext';
 import ThemeAwareView from '../components/ThemeAwareView';
+import { useTheme as useCustomTheme } from '../context/ThemeContext';
 
 export default function TasksScreen() {
   const { t } = useTranslation();
@@ -593,10 +593,21 @@ export default function TasksScreen() {
           mode="outlined" 
           onPress={() => setCategoryMenuVisible(true)}
           icon="folder"
-          style={styles.categoryButton}
+          style={[
+            styles.categoryButton,
+            { 
+              minWidth: dimensions.width < 400 ? 60 : 100,
+              height: dimensions.width < 400 ? 30 : 36,
+              marginLeft: dimensions.width < 400 ? 4 : 8
+            }
+          ]}
+          contentStyle={{ padding: dimensions.width < 400 ? 2 : 4 }}
+          labelStyle={{ fontSize: dimensions.width < 400 ? 8 : 12 }}
           textColor={theme.colors.primary}
         >
-          {categories.find(c => c.id === categoryFilter)?.name || t('tasks.all')}
+          {dimensions.width < 400 
+            ? (categories.find(c => c.id === categoryFilter)?.name || t('tasks.all')).substring(0, 3) + '..'
+            : (categories.find(c => c.id === categoryFilter)?.name || t('tasks.all'))}
         </Button>
       }
       contentStyle={{ backgroundColor: theme.colors.surface }}
@@ -677,45 +688,72 @@ export default function TasksScreen() {
         <PageBackground pageName="tasks" />
         <StatusBar style={isDarkMode ? 'light' : 'dark'} />
         
-        <View style={styles.searchContainer}>
+        <View style={[
+          styles.searchContainer
+        ]}>
           <Searchbar
             placeholder={t('tasks.searchPlaceholder')}
             onChangeText={setSearchQuery}
             value={searchQuery}
             style={styles.searchBar}
             iconColor={theme.colors.primary}
-            inputStyle={{ color: theme.colors.onBackground }}
+            inputStyle={{ 
+              color: theme.colors.onBackground
+            }}
             placeholderTextColor={theme.colors.onSurfaceVariant}
             theme={theme}
           />
           <CategoryMenu />
         </View>
 
-        <SegmentedButtons
-          value={filter}
-          onValueChange={setFilter}
-          buttons={[
-            { 
-              value: 'all', 
-              label: t('tasks.all'),
-              style: { backgroundColor: filter === 'all' ? theme.colors.primary : theme.colors.surface },
-              labelStyle: { color: filter === 'all' ? 'white' : theme.colors.onSurface }
-            },
-            { 
-              value: 'active', 
-              label: t('tasks.active'),
-              style: { backgroundColor: filter === 'active' ? theme.colors.primary : theme.colors.surface },
-              labelStyle: { color: filter === 'active' ? 'white' : theme.colors.onSurface }
-            },
-            { 
-              value: 'completed', 
-              label: t('tasks.completed'),
-              style: { backgroundColor: filter === 'completed' ? theme.colors.primary : theme.colors.surface },
-              labelStyle: { color: filter === 'completed' ? 'white' : theme.colors.onSurface }
-            }
-          ]}
-          style={styles.filterButtons}
-        />
+        <View style={{ alignItems: 'center' }}>
+          <SegmentedButtons
+            value={filter}
+            onValueChange={setFilter}
+            buttons={[
+              { 
+                value: 'all', 
+                label: dimensions.width < 400 ? (t('tasks.allShort') || 'Все') : t('tasks.all'),
+                style: { 
+                  backgroundColor: filter === 'all' ? theme.colors.primary : theme.colors.surface,
+                  paddingHorizontal: dimensions.width < 400 ? 0 : 4
+                },
+                labelStyle: { 
+                  color: filter === 'all' ? 'white' : theme.colors.onSurface,
+                  fontSize: dimensions.width < 400 ? 10 : 12
+                }
+              },
+              { 
+                value: 'active', 
+                label: dimensions.width < 400 ? (t('tasks.activeShort') || 'Актив.') : t('tasks.active'),
+                style: { 
+                  backgroundColor: filter === 'active' ? theme.colors.primary : theme.colors.surface,
+                  paddingHorizontal: dimensions.width < 400 ? 0 : 4
+                },
+                labelStyle: { 
+                  color: filter === 'active' ? 'white' : theme.colors.onSurface,
+                  fontSize: dimensions.width < 400 ? 10 : 12
+                }
+              },
+              { 
+                value: 'completed', 
+                label: dimensions.width < 400 ? (t('tasks.completedShort') || 'Выполн.') : t('tasks.completed'),
+                style: { 
+                  backgroundColor: filter === 'completed' ? theme.colors.primary : theme.colors.surface,
+                  paddingHorizontal: dimensions.width < 400 ? 0 : 4
+                },
+                labelStyle: { 
+                  color: filter === 'completed' ? 'white' : theme.colors.onSurface,
+                  fontSize: dimensions.width < 400 ? 10 : 12
+                }
+              }
+            ]}
+            style={[
+              styles.filterButtons
+            ]}
+            density="small"
+          />
+        </View>
         
         <View style={styles.taskListContainer}>
           {loading ? (
@@ -791,15 +829,17 @@ const styles = StyleSheet.create({
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     paddingHorizontal: 16,
     paddingVertical: 8,
     zIndex: 10,
     width: '100%',
-    maxWidth: 1320, // Significantly increased from 1120
+    maxWidth: 1320,
     alignSelf: 'center',
   },
   searchBar: {
-    flex: 1,
+    width: '50%',
+    maxWidth: 400,
     marginRight: 8,
   },
   categoryButton: {
@@ -808,9 +848,10 @@ const styles = StyleSheet.create({
   filterButtons: {
     marginHorizontal: 16,
     marginBottom: 8,
+    marginTop: 4,
     zIndex: 5,
-    width: '100%',
-    maxWidth: 1288, // Match searchContainer width - horizontal padding
+    width: '60%',
+    maxWidth: 500,
     alignSelf: 'center',
   },
   taskListContainer: {
